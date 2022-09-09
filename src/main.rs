@@ -28,18 +28,21 @@ async fn main() -> anyhow::Result<()> {
                 let matches = valid_url1.find_iter(message.content.as_str())
                     .chain(valid_url2.find_iter(message.content.as_str()));
 
+                let handles = matches.enumerate()
+                    .map(|(i, url)| tokio::spawn(get_video(i, String::from(url.as_str()))));
+
                 let mut attachments = vec![];
-                for (i, url) in matches.enumerate() {
-                    match tokio::spawn(get_video(String::from(url.as_str()), i)).await {
+                for handle in handles {
+                    match handle.await {
                         Ok(attachment) => attachments.push(attachment),
                         Err(err) => eprintln!("{}", err)
                     }
                 }
 
-                http.create_message(message.channel_id)
+                if let Err(err) = http.create_message(message.channel_id)
                     .reply(message.id)
                     .attachments(attachments.as_slice()).unwrap()
-                    .exec().await?;
+                    .exec().await { eprint!("{}", err) }
             }
 
         }
@@ -48,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
     Err(anyhow::anyhow!("How did we get here?"))
 }
 
-async fn get_video(url: String, attachment_idx: usize) -> Attachment {
+async fn get_video(i: usize, url: String) -> Attachment {
     let output = tokio::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
         .args(["/C", "yt-dlp"])
         .args([url.as_str(), "-f", "best*[vcodec=h264]", "-o", "-"])
@@ -58,5 +61,5 @@ async fn get_video(url: String, attachment_idx: usize) -> Attachment {
         panic!("Process excited unsuccessfully: {:?}\n{:?}", output.status.code(), String::from_utf8(output.stderr));
     }
 
-    Attachment::from_bytes(String::from("video.mp4"), output.stdout, attachment_idx as u64)
+    Attachment::from_bytes(String::from("video.mp4"), output.stdout, i as u64)
 }
