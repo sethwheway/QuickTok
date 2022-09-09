@@ -15,17 +15,21 @@ async fn main() -> anyhow::Result<()> {
     println!("{}#{} {}", me.name, me.discriminator, me.id);
 
 
-    let valid_url = regex::Regex::new(r"https?://www\.tiktok\.com/(?:embed|@(?P<user_id>[\w\.-]+)/video)/(?P<id>\d+)").unwrap();
+    let valid_url1 = regex::Regex::new(r"https?://www\.tiktok\.com/(?:embed|@(?P<user_id>[\w\.-]+)/video)/(?P<id>\d+)").unwrap();
+    let valid_url2 = regex::Regex::new(r"https?://(?:vm|vt)\.tiktok\.com/(?P<id>\w+)").unwrap();
 
     while let Some(event) = events.next().await {
         if let Event::MessageCreate(message) = event {
 
-            if valid_url.is_match(message.content.as_str()) {
+            if valid_url1.is_match(message.content.as_str()) || valid_url2.is_match(message.content.as_str()) {
                 http.create_typing_trigger(message.channel_id)
                     .exec().await.ok();
 
+                let matches = valid_url1.find_iter(message.content.as_str())
+                    .chain(valid_url2.find_iter(message.content.as_str()));
+
                 let mut attachments = vec![];
-                for (i, url) in valid_url.find_iter(message.content.as_str()).enumerate() {
+                for (i, url) in matches.enumerate() {
                     match tokio::spawn(get_video(String::from(url.as_str()), i)).await {
                         Ok(attachment) => attachments.push(attachment),
                         Err(err) => eprintln!("{}", err)
