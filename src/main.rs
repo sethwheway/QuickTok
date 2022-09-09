@@ -1,19 +1,14 @@
-use std::sync::Arc;
-
 use futures_util::StreamExt;
 use twilight_gateway::{Event, Intents, Shard};
 use twilight_http::Client;
-use twilight_model::{
-    gateway::payload::incoming::MessageCreate as MessageCreatePayload,
-    http::attachment::Attachment,
-};
+use twilight_model::http::attachment::Attachment;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let token = std::env::var("TOKEN")?;
 
     let (shard, mut events) = Shard::new(token.clone(), Intents::GUILD_MESSAGES | Intents::MESSAGE_CONTENT);
-    let http = Arc::new(Client::new(token.clone()));
+    let http = Client::new(token.clone());
 
     shard.start().await?;
     let me = http.current_user().exec().await.unwrap().model().await.unwrap();
@@ -25,20 +20,31 @@ async fn main() -> anyhow::Result<()> {
     while let Some(event) = events.next().await {
         if let Event::MessageCreate(message) = event {
 
-            if let Some(url) = valid_url.find(message.content.as_str()) {
-                tokio::spawn(handle(http.clone(), String::from(url.as_str()), message)).await
-                    .unwrap_or_else(|err| eprint!("{}", err));
+            if valid_url.is_match(message.content.as_str()) {
+                http.create_typing_trigger(message.channel_id)
+                    .exec().await.ok();
+
+                let mut attachments = vec![];
+                for (i, url) in valid_url.find_iter(message.content.as_str()).enumerate() {
+                    match tokio::spawn(get_video(String::from(url.as_str()), i)).await {
+                        Ok(attachment) => attachments.push(attachment),
+                        Err(err) => eprintln!("{}", err)
+                    }
+                }
+
+                http.create_message(message.channel_id)
+                    .reply(message.id)
+                    .attachments(attachments.as_slice()).unwrap()
+                    .exec().await?;
             }
+
         }
     }
 
     Err(anyhow::anyhow!("How did we get here?"))
 }
 
-async fn handle(http: Arc<Client>, url: String, message: Box<MessageCreatePayload>) {
-    http.create_typing_trigger(message.channel_id)
-        .exec().await.unwrap();
-
+async fn get_video(url: String, attachment_idx: usize) -> Attachment {
     let output = tokio::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
         .args(["/C", "yt-dlp"])
         .args([url.as_str(), "-f", "best*[vcodec=h264]", "-o", "-"])
@@ -48,9 +54,5 @@ async fn handle(http: Arc<Client>, url: String, message: Box<MessageCreatePayloa
         panic!("Process excited unsuccessfully: {:?}\n{:?}", output.status.code(), String::from_utf8(output.stderr));
     }
 
-    let video = output.stdout;
-    http.create_message(message.channel_id)
-        .reply(message.id)
-        .attachments(&[Attachment::from_bytes(String::from("video.mp4"), video, 0)]).unwrap()
-        .exec().await.unwrap();
+    Attachment::from_bytes(String::from("video.mp4"), output.stdout, attachment_idx as u64)
 }
