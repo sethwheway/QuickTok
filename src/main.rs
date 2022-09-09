@@ -38,11 +38,12 @@ async fn main() -> anyhow::Result<()> {
                         Err(err) => eprintln!("{}", err)
                     }
                 }
-
-                if let Err(err) = http.create_message(message.channel_id)
-                    .reply(message.id)
-                    .attachments(attachments.as_slice()).unwrap()
-                    .exec().await { eprint!("{}", err) }
+                if !attachments.is_empty() {
+                    if let Err(err) = http.create_message(message.channel_id)
+                        .reply(message.id)
+                        .attachments(attachments.as_slice()).unwrap()
+                        .exec().await { eprint!("{}", err) }
+                };
             }
 
         }
