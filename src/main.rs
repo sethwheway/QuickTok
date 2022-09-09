@@ -52,8 +52,10 @@ async fn main() -> anyhow::Result<()> {
 }
 
 async fn get_video(i: usize, url: String) -> Attachment {
-    let output = tokio::process::Command::new(if cfg!(windows) { "cmd" } else { "sh" })
-        .args([if cfg!(windows) { "/C" } else { "-c" }, "yt-dlp"])
+    let (shell, flag, executable) = if cfg!(windows) { ("cmd", "/C", "yt-dlp") } else { ("sh", "-c", "./yt-dlp") };
+
+    let output = tokio::process::Command::new(shell)
+        .args([flag, executable])
         .args([url.as_str(), "-f", "best*[vcodec=h264]", "-o", "-"])
         .output().await.unwrap();
 
