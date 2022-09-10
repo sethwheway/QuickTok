@@ -5,7 +5,7 @@ use twilight_model::http::attachment::Attachment;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let token = std::env::var("TOKEN")?;
+    let token = std::env::var("DISCORD_TOKEN")?;
 
     let (shard, mut events) = Shard::new(token.clone(), Intents::GUILD_MESSAGES | Intents::MESSAGE_CONTENT);
     let http = Client::new(token.clone());
