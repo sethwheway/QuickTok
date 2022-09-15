@@ -5,9 +5,7 @@ edition = "2021"
 
 [dependencies]
 tokio = { version = "1.21.0", features = ["rt-multi-thread", "process", "macros"] }
-twilight-model = "0.13.2"
-twilight-gateway = { version = "0.13.0", default-features = false, features = ["native"] }
-twilight-http = { version = "0.13.0", default-features = false, features = ["native", "trust-dns"] }
+serenity = { version = "0.11.5", default-features = false, features = ["native_tls_backend", "client", "gateway", "http", "model"] }
 anyhow = "1.0.64"
+lazy_static = "1.4.0"
 regex = "1.6.0"
-futures-util = "0.3.24"

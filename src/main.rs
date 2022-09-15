@@ -1,65 +1,114 @@
-use futures_util::StreamExt;
-use twilight_gateway::{Event, Intents, Shard};
-use twilight_http::Client;
-use twilight_model::http::attachment::Attachment;
+use serenity::{async_trait, http::typing::Typing, model::prelude::*, prelude::*};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let token = std::env::var("DISCORD_TOKEN")?;
+<<<<<<< HEAD
+    let mut client = Client::builder
+        (token, GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT)
+        .event_handler(Handler)
+        .await?;
+=======
+>>>>>>> c7cf82e94aaad71c179666497652170205b4a5ef
 
-    let (shard, mut events) = Shard::new(token.clone(), Intents::GUILD_MESSAGES | Intents::MESSAGE_CONTENT);
-    let http = Client::new(token.clone());
+    client.start().await?;
 
-    shard.start().await?;
-    let me = http.current_user().exec().await.unwrap().model().await.unwrap();
-    println!("{}#{} {}", me.name, me.discriminator, me.id);
-
-
-    let valid_url1 = regex::Regex::new(r"https?://www\.tiktok\.com/(?:embed|@(?P<user_id>[\w\.-]+)/video)/(?P<id>\d+)").unwrap();
-    let valid_url2 = regex::Regex::new(r"https?://(?:vm|vt)\.tiktok\.com/(?P<id>\w+)").unwrap();
-
-    while let Some(event) = events.next().await {
-        if let Event::MessageCreate(message) = event {
-
-            if valid_url1.is_match(message.content.as_str()) || valid_url2.is_match(message.content.as_str()) {
-                http.create_typing_trigger(message.channel_id)
-                    .exec().await.ok();
-
-                let matches = valid_url1.find_iter(message.content.as_str())
-                    .chain(valid_url2.find_iter(message.content.as_str()));
-
-                let handles = matches.enumerate()
-                    .map(|(i, url)| tokio::spawn(get_video(i, String::from(url.as_str()))));
-
-                let mut attachments = vec![];
-                for handle in handles {
-                    match handle.await {
-                        Ok(attachment) => attachments.push(attachment),
-                        Err(err) => eprintln!("{}", err)
-                    }
-                }
-                if !attachments.is_empty() {
-                    if let Err(err) = http.create_message(message.channel_id)
-                        .reply(message.id)
-                        .attachments(attachments.as_slice()).unwrap()
-                        .exec().await { eprint!("{}", err) }
-                };
-            }
-
-        }
-    }
 
     Err(anyhow::anyhow!("How did we get here?"))
 }
 
+<<<<<<< HEAD
+
+lazy_static::lazy_static! {
+    static ref VALID_URLS: [regex::Regex; 2] = [
+        regex::Regex::new(r"https?://www\.tiktok\.com/(?:embed|@(?P<user_id>[\w\.-]+)/video)/(?P<id>\d+)").unwrap(),
+        regex::Regex::new(r"https?://(?:vm|vt)\.tiktok\.com/(?P<id>\w+)").unwrap()
+    ];
+}
+
+struct Handler;
+
+#[async_trait]
+impl EventHandler for Handler {
+    async fn ready(&self, _: Context, ready: Ready) {
+        println!("{}#{} {}\nGuilds: {}", ready.user.name, ready.user.discriminator, ready.user.id, ready.guilds.len());
+    }
+
+    async fn message(&self, ctx: Context, message: Message) {
+        let content = message.content.as_str();
+        if !(VALID_URLS[0].is_match(content) || VALID_URLS[1].is_match(content)) { return; }
+
+        let typing = Typing::start(ctx.http.clone(), message.channel_id.0);
+
+        let matches = VALID_URLS.iter().flat_map(|re| re.find_iter(content));
+        let handles = matches.map(|url| tokio::spawn(get_video(String::from(url.as_str()))));
+
+        let mut errored = 0;
+        let mut too_large = 0;
+        let mut videos = Vec::new();
+        for handle in handles {
+            match handle.await {
+                Ok(video) if video.len() > 8 * 1024 * 1000 => too_large += 1,
+                Ok(video) => videos.push(video),
+                Err(err) => {
+                    eprint!("{}", err);
+                    errored += 1;
+                }
+            }
+        }
+
+        let mut content = String::from("Sorry! ");
+        if errored > 0 {
+            content += format!(
+                "Something went wrong with {} video{}. ",
+                errored, if errored > 1 { "s" } else { "" }
+            ).as_str();
+        }
+        if too_large > 0 {
+            content += format!(
+                "{} video{} {} too large.",
+                too_large, if too_large > 1 { "s" } else { "" }, if too_large > 1 { "were" } else { "was" }
+            ).as_str();
+        }
+
+        message.channel_id.send_message(ctx.http, |m| {
+            m.reference_message(&message);
+            for video in videos {
+                m.add_file(AttachmentType::Bytes {
+                    data: std::borrow::Cow::from(video),
+                    filename: String::from("video.mp4"),
+                });
+            }
+            if errored > 0 || too_large > 0 { m.content(content); }
+            m
+        }).await.unwrap();
+
+
+        if let Ok(typing) = typing { typing.stop(); }
+    }
+}
+
+async fn get_video(url: String) -> Vec<u8> {
+    let output = tokio::process::Command::new("./yt-dlp")
+        .args([url.as_str(), "-f", "best*[vcodec=h264][filesize<8M]", "-o", "-"])
+=======
 async fn get_video(i: usize, url: String) -> Attachment {
     let output = tokio::process::Command::new("./yt-dlp")
         .args([url.as_str(), "-f", "best*[vcodec=h264]", "-o", "-"])
+>>>>>>> c7cf82e94aaad71c179666497652170205b4a5ef
         .output().await.unwrap();
 
     if !output.status.success() {
-        panic!("Process excited unsuccessfully: {:?}\n{:?}", output.status.code(), String::from_utf8(output.stderr));
+        panic!(
+            "Process excited unsuccessfully: {:?}\n{:?}",
+            output.status.code(), String::from_utf8(output.stderr)
+        )
     }
 
+<<<<<<< HEAD
+    output.stdout
+}
+=======
     Attachment::from_bytes(String::from("video.mp4"), output.stdout, i as u64)
 }
+>>>>>>> c7cf82e94aaad71c179666497652170205b4a5ef
