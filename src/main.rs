@@ -1,15 +1,13 @@
 use serenity::{async_trait, http::typing::Typing, model::prelude::*, prelude::*};
 
+
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     let token = std::env::var("DISCORD_TOKEN")?;
-<<<<<<< HEAD
     let mut client = Client::builder
         (token, GatewayIntents::non_privileged() | GatewayIntents::MESSAGE_CONTENT)
         .event_handler(Handler)
         .await?;
-=======
->>>>>>> c7cf82e94aaad71c179666497652170205b4a5ef
 
     client.start().await?;
 
@@ -17,7 +15,6 @@ async fn main() -> anyhow::Result<()> {
     Err(anyhow::anyhow!("How did we get here?"))
 }
 
-<<<<<<< HEAD
 
 lazy_static::lazy_static! {
     static ref VALID_URLS: [regex::Regex; 2] = [
@@ -91,11 +88,6 @@ impl EventHandler for Handler {
 async fn get_video(url: String) -> Vec<u8> {
     let output = tokio::process::Command::new("./yt-dlp")
         .args([url.as_str(), "-f", "best*[vcodec=h264][filesize<8M]", "-o", "-"])
-=======
-async fn get_video(i: usize, url: String) -> Attachment {
-    let output = tokio::process::Command::new("./yt-dlp")
-        .args([url.as_str(), "-f", "best*[vcodec=h264]", "-o", "-"])
->>>>>>> c7cf82e94aaad71c179666497652170205b4a5ef
         .output().await.unwrap();
 
     if !output.status.success() {
@@ -105,10 +97,5 @@ async fn get_video(i: usize, url: String) -> Attachment {
         )
     }
 
-<<<<<<< HEAD
     output.stdout
 }
-=======
-    Attachment::from_bytes(String::from("video.mp4"), output.stdout, i as u64)
-}
->>>>>>> c7cf82e94aaad71c179666497652170205b4a5ef
