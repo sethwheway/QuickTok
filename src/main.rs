@@ -41,11 +41,9 @@ impl EventHandler for Handler {
         let handles = matches.map(|url| tokio::spawn(get_video(String::from(url.as_str()))));
 
         let mut errored = 0;
-        let mut too_large = 0;
         let mut videos = Vec::new();
         for handle in handles {
             match handle.await {
-                Ok(video) if video.len() > 8 * 1024 * 1000 => too_large += 1,
                 Ok(video) => videos.push(video),
                 Err(err) => {
                     eprint!("{}", err);
@@ -57,14 +55,8 @@ impl EventHandler for Handler {
         let mut content = String::from("Sorry! ");
         if errored > 0 {
             content += format!(
-                "Something went wrong with {} video{}. ",
+                "Something went wrong with {} video{}.",
                 errored, if errored > 1 { "s" } else { "" }
-            ).as_str();
-        }
-        if too_large > 0 {
-            content += format!(
-                "{} video{} {} too large.",
-                too_large, if too_large > 1 { "s" } else { "" }, if too_large > 1 { "were" } else { "was" }
             ).as_str();
         }
 
@@ -76,7 +68,7 @@ impl EventHandler for Handler {
                     filename: String::from("video.mp4"),
                 });
             }
-            if errored > 0 || too_large > 0 { m.content(content); }
+            if errored > 0 { m.content(content); }
             m
         }).await.unwrap();
 
